@@ -42,6 +42,8 @@ class _PatientAppointmentsScreenState extends State<PatientAppointmentsScreen> {
   Future<void> _cancelAppointment(AppointmentItem item) async {
     try {
       await widget.api.deleteJson('/api/appointments/${item.id}', auth: true);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Hủy lịch thành công')));
       setState(() => _future = _fetchAppointments());
     } on ApiException catch (e) {
       if (!mounted) return;
@@ -96,12 +98,12 @@ class _PatientAppointmentsScreenState extends State<PatientAppointmentsScreen> {
                           return ListTile(
                             title: Text('${item.doctorName ?? 'Bác sĩ'} • ${item.appointmentTime}'),
                             subtitle: Text('${item.reason} • ${item.status}'),
-                            trailing: canCancel
-                                ? OutlinedButton(
-                                    onPressed: () => _cancelAppointment(item),
-                                    child: const Text('Hủy'),
-                                  )
-                                : null,
+                          trailing: canCancel
+                              ? OutlinedButton(
+                                  onPressed: () => _cancelAppointment(item),
+                                  child: const Text('Hủy'),
+                                )
+                                : const Text('Không thể hủy'),
                           );
                         },
                       );

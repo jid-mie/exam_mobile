@@ -18,6 +18,7 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
   Future<List<PatientItem>>? _patientsFuture;
   final _doctorIdCtrl = TextEditingController();
   Future<List<AppointmentItem>>? _doctorAppointmentsFuture;
+  int? _currentDoctorId;
 
   @override
   void initState() {
@@ -58,7 +59,14 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
   Future<void> _confirmAppointment(AppointmentItem item) async {
     try {
       await widget.api.putJson('/api/appointments/${item.id}/confirm', auth: true);
-      setState(() => _appointmentsFuture = _fetchAppointments());
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Xác nhận lịch thành công')));
+      setState(() {
+        _appointmentsFuture = _fetchAppointments();
+        if (_currentDoctorId != null) {
+          _doctorAppointmentsFuture = _fetchDoctorAppointments(_currentDoctorId!);
+        }
+      });
     } on ApiException catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
@@ -66,13 +74,43 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
   }
 
   Future<void> _completeAppointment(AppointmentItem item) async {
+    final diagnosisCtrl = TextEditingController();
+    final prescriptionCtrl = TextEditingController();
+    final notesCtrl = TextEditingController();
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Hoàn thành lịch hẹn'),
+        content: SingleChildScrollView(
+          child: Column(
+            children: [
+              TextField(controller: diagnosisCtrl, decoration: const InputDecoration(labelText: 'Chẩn đoán')),
+              TextField(controller: prescriptionCtrl, decoration: const InputDecoration(labelText: 'Đơn thuốc')),
+              TextField(controller: notesCtrl, decoration: const InputDecoration(labelText: 'Ghi chú')),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Hủy')),
+          FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('Xác nhận')),
+        ],
+      ),
+    );
+    if (ok != true || !mounted) return;
     try {
       await widget.api.putJson('/api/appointments/${item.id}/complete', auth: true, body: {
-        'diagnosis': 'Chẩn đoán',
-        'prescription': 'Đơn thuốc',
-        'notes': 'Ghi chú',
+        'diagnosis': diagnosisCtrl.text.trim().isEmpty ? 'Chẩn đoán' : diagnosisCtrl.text.trim(),
+        'prescription': prescriptionCtrl.text.trim().isEmpty ? 'Đơn thuốc' : prescriptionCtrl.text.trim(),
+        'notes': notesCtrl.text.trim().isEmpty ? null : notesCtrl.text.trim(),
       });
-      setState(() => _appointmentsFuture = _fetchAppointments());
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Hoàn thành lịch hẹn')));
+      setState(() {
+        _appointmentsFuture = _fetchAppointments();
+        if (_currentDoctorId != null) {
+          _doctorAppointmentsFuture = _fetchDoctorAppointments(_currentDoctorId!);
+        }
+      });
     } on ApiException catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
@@ -82,7 +120,57 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
   Future<void> _cancelAppointment(AppointmentItem item) async {
     try {
       await widget.api.deleteJson('/api/appointments/${item.id}', auth: true);
-      setState(() => _appointmentsFuture = _fetchAppointments());
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Hủy lịch thành công')));
+      setState(() {
+        _appointmentsFuture = _fetchAppointments();
+        if (_currentDoctorId != null) {
+          _doctorAppointmentsFuture = _fetchDoctorAppointments(_currentDoctorId!);
+        }
+      });
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
+    }
+  }
+
+  Future<void> _editPatient(PatientItem patient) async {
+    final detail = await widget.api.getJson('/api/patients/${patient.id}', auth: true);
+    final data = detail['data'] as Map<String, dynamic>;
+    final nameCtrl = TextEditingController(text: (data['full_name'] ?? '').toString());
+    final phoneCtrl = TextEditingController(text: (data['phone_number'] ?? '').toString());
+    final addressCtrl = TextEditingController(text: (data['address'] ?? '').toString());
+
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Cập nhật bệnh nhân'),
+        content: SingleChildScrollView(
+          child: Column(
+            children: [
+              TextField(controller: nameCtrl, decoration: const InputDecoration(labelText: 'Họ tên')),
+              TextField(controller: phoneCtrl, decoration: const InputDecoration(labelText: 'SĐT')),
+              TextField(controller: addressCtrl, decoration: const InputDecoration(labelText: 'Địa chỉ')),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Hủy')),
+          FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('Lưu')),
+        ],
+      ),
+    );
+    if (ok != true || !mounted) return;
+
+    try {
+      await widget.api.putJson('/api/patients/${patient.id}', auth: true, body: {
+        'full_name': nameCtrl.text.trim(),
+        'phone_number': phoneCtrl.text.trim().isEmpty ? null : phoneCtrl.text.trim(),
+        'address': addressCtrl.text.trim().isEmpty ? null : addressCtrl.text.trim(),
+      });
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Cập nhật bệnh nhân thành công')));
+      setState(() => _patientsFuture = _fetchPatients());
     } on ApiException catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
@@ -182,7 +270,10 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                 onPressed: () {
                   final id = int.tryParse(_doctorIdCtrl.text.trim());
                   if (id == null) return;
-                  setState(() => _doctorAppointmentsFuture = _fetchDoctorAppointments(id));
+                  setState(() {
+                    _currentDoctorId = id;
+                    _doctorAppointmentsFuture = _fetchDoctorAppointments(id);
+                  });
                 },
                 child: const Text('Xem'),
               ),
@@ -205,6 +296,25 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                         contentPadding: EdgeInsets.zero,
                         title: Text('${item.patientName ?? 'Bệnh nhân'} • ${item.appointmentTime}'),
                         subtitle: Text('${item.reason} • ${item.status}'),
+                        trailing: Wrap(
+                          spacing: 6,
+                          children: [
+                            if (item.status == 'scheduled')
+                              OutlinedButton(
+                                onPressed: () => _confirmAppointment(item),
+                                child: const Text('Xác nhận'),
+                              ),
+                            if (item.status != 'completed' && item.status != 'cancelled')
+                              FilledButton(
+                                onPressed: () => _completeAppointment(item),
+                                child: const Text('Hoàn thành'),
+                              ),
+                            OutlinedButton(
+                              onPressed: () => _cancelAppointment(item),
+                              child: const Text('Hủy'),
+                            ),
+                          ],
+                        ),
                       ),
                     )
                     .toList(),
@@ -230,7 +340,16 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                         contentPadding: EdgeInsets.zero,
                         title: Text(item.fullName),
                         subtitle: Text(item.email),
-                        trailing: Text(item.phone ?? ''),
+                        trailing: Wrap(
+                          spacing: 8,
+                          children: [
+                            Text(item.phone ?? ''),
+                            IconButton(
+                              onPressed: () => _editPatient(item),
+                              icon: const Icon(Icons.edit),
+                            ),
+                          ],
+                        ),
                       ),
                     )
                     .toList(),

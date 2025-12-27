@@ -65,6 +65,8 @@ class _DoctorHomeScreenState extends State<DoctorHomeScreen> {
   Future<void> _confirmAppointment(AppointmentItem item) async {
     try {
       await widget.api.putJson('/api/appointments/${item.id}/confirm', auth: true);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Xác nhận lịch thành công')));
       setState(() => _future = _fetchAppointments());
     } on ApiException catch (e) {
       if (!mounted) return;
@@ -106,6 +108,8 @@ class _DoctorHomeScreenState extends State<DoctorHomeScreen> {
           'notes': notesCtrl.text.trim().isEmpty ? null : notesCtrl.text.trim(),
         },
       );
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Hoàn thành lịch hẹn')));
       setState(() => _future = _fetchAppointments());
     } on ApiException catch (e) {
       if (!mounted) return;
@@ -116,6 +120,8 @@ class _DoctorHomeScreenState extends State<DoctorHomeScreen> {
   Future<void> _cancelAppointment(AppointmentItem item) async {
     try {
       await widget.api.deleteJson('/api/appointments/${item.id}', auth: true);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Hủy lịch thành công')));
       setState(() => _future = _fetchAppointments());
     } on ApiException catch (e) {
       if (!mounted) return;
